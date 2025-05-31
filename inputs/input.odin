@@ -37,13 +37,12 @@ update_input :: proc(dt: f32) {
 		game.move_player(player, forward, strafe, dt)
 	}
 
-  shoot()
+	shoot()
 }
 
 shoot :: proc() {
 	player := game.get_player()
 	if player.state == game.PlayerState.idle && rl.IsMouseButtonPressed(.LEFT) {
-		player.state = game.PlayerState.shooting
-    player.shoot_start_frame = int(rl.GetTime() * 12) // Start the shooting animation at the current time
-  }
+		game.fire_shot(player)
+	}
 }

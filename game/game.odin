@@ -22,6 +22,10 @@ init :: proc() {
 		pitch_limit = math.PI * 0.4,
 	}
 
+	game_state.player.shoot_range = 10.0
+	game_state.player.fire_rate = 2.0
+	game_state.player.last_shot_time = 0.0
+
 	game_state.player.state = PlayerState.idle
 	game_state.player.idle_sprite = rl.LoadTexture("assets/Idle.png")
 

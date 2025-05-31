@@ -7,6 +7,7 @@ GameState :: struct {
 	player:    Player,
 	level_map: Map,
 	running:   bool,
+	enemies:   [dynamic]Enemy,
 }
 
 game_state: GameState
@@ -22,6 +23,9 @@ init :: proc() {
 		pitch_limit = math.PI * 0.4,
 	}
 
+	game_state.enemies = make([dynamic]Enemy)
+
+	append(&game_state.enemies, create_dummy_enemy())
 	game_state.player.shoot_range = 10.0
 	game_state.player.fire_rate = 2.0
 	game_state.player.last_shot_time = 0.0
@@ -46,4 +50,20 @@ get_player :: proc() -> ^Player {
 
 get_map :: proc() -> ^Map {
 	return &game_state.level_map
+}
+
+@(private = "file")
+create_dummy_enemy :: proc() -> Enemy {
+	enemy_sprite := rl.LoadTexture("assets/Enemy.png")
+
+	return {
+		pos = {5.0, 5.0},
+		angle = 0,
+		health = 100,
+		max_health = 100,
+		state = .idle,
+		sprite = enemy_sprite,
+		size = 0.3,
+		alive = true,
+	}
 }

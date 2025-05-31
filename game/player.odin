@@ -99,9 +99,58 @@ fire_shot :: proc(player: ^Player) -> ShotResult {
   return shot_result
 }
 
+check_enemy_hit :: proc(start: [2]f32, dx, dy, max_range: f32) -> ShotResult {
+  enemies := &game_state.enemies
+  closest_distance := max_range
+  hit_enemy := false
+
+  for i in 0..<len(enemies) {
+    enemy := &enemies[i]
+    if !enemy.alive do continue
+
+    // Vector from start to enemy
+    to_enemy := enemy.pos - start
+
+    // Project enemy position onto ray
+    projection := to_enemy.x * dx + to_enemy.y * dy
+
+    if projection < 0 || projection > max_range do continue
+
+    // Calculate perpendicular distance from ray to enemy
+    closest_point := start + [2]f32{dx * projection, dy * projection}
+    distance_to_enemy := math.sqrt(math.pow(enemy.pos.x - closest_point.x, 2) + 
+      math.pow(enemy.pos.y - closest_point.y, 2))
+
+    if distance_to_enemy <= enemy.size && projection < closest_distance {
+      closest_distance = projection
+      hit_enemy = true
+
+      // Damage the enemy
+      enemy.health -= 25
+      if enemy.health <= 0 {
+        enemy.alive = false
+        enemy.state = .dead
+      }
+    }
+  }
+
+  if hit_enemy {
+    return ShotResult{
+      hit = true,
+      distance = closest_distance,
+      hit_pos = start + [2]f32{dx * closest_distance, dy * closest_distance},
+      wall_type = 255, // Special value for enemy hit
+    }
+  }
+
+  return ShotResult{hit = false}
+}
+
 cast_shot_ray :: proc(start: [2]f32, angle: f32, max_range: f32) -> ShotResult {
   dx := math.cos(angle)
   dy := math.sin(angle)
+
+  closest_enemy_hit := check_enemy_hit(start, dx, dy, max_range)
 
   map_x := int(start.x)
   map_y := int(start.y)
@@ -166,6 +215,10 @@ cast_shot_ray :: proc(start: [2]f32, angle: f32, max_range: f32) -> ShotResult {
       hit = true
       tile_identity = map_tile
     }
+  }
+
+  if closest_enemy_hit.hit && closest_enemy_hit.distance < distance {
+    return closest_enemy_hit
   }
 
   hit_pos := [2]f32{start.x + dx * distance, start.y + dy * distance}

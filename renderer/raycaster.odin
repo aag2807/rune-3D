@@ -4,6 +4,7 @@ import u "../constants"
 import "../game"
 import "core:fmt"
 import "core:math"
+import "core:slice"
 import rl "vendor:raylib"
 
 SCREEN_WIDTH :: 800
@@ -23,7 +24,7 @@ render_frame :: proc() {
 
 
 	render_3d_view(camera, game_map)
-	render_enemies_2d(camera)
+	render_enemies_3d(camera)
 	render_crosshair()
 	render_player_sprites(player)
 }
@@ -204,20 +205,107 @@ render_crosshair :: proc() {
 }
 
 @(private = "file")
-render_enemies_2d :: proc(camera: Camera) {
+render_enemies_3d :: proc(camera: Camera) {
 	enemies := game.get_enemies()
 
-	for enemy in enemies {
+	// Create a list of enemies with their distances for depth sorting
+	Enemy_Render_Data :: struct {
+		enemy:       ^game.Enemy,
+		distance:    f32,
+		screen_x:    f32,
+		sprite_size: f32,
+	}
+
+	render_list: [dynamic]Enemy_Render_Data
+	defer delete(render_list)
+
+	for &enemy in enemies {
 		if !enemy.alive do continue
 
+		// Calculate relative position to camera
 		rel_x := enemy.pos.x - camera.pos.x
 		rel_y := enemy.pos.y - camera.pos.y
 
-		distance := math.sqrt(rel_x * rel_x + rel_y * rel_y)
+		// Rotate relative to camera angle (transform to camera space)
+		cos_a := math.cos(-camera.angle)
+		sin_a := math.sin(-camera.angle)
 
-		if distance < 8.0 {
+		transformed_x := rel_x * cos_a - rel_y * sin_a
+		transformed_y := rel_x * sin_a + rel_y * cos_a
 
-			rl.DrawTextureEx(enemy.sprite, enemy.pos, 0, 1, rl.WHITE)
+		// Skip if behind camera or too far
+		if transformed_y <= 0.1 || transformed_y > 15.0 do continue
+
+		// Project to screen coordinates
+		screen_x :=
+			(transformed_x / transformed_y) * (f32(SCREEN_WIDTH) / 2) + f32(SCREEN_WIDTH) / 2
+
+		// Calculate sprite size based on distance
+		sprite_size := f32(SCREEN_HEIGHT) / transformed_y * 0.8 // 0.8 is size multiplier
+
+		// Only render if on screen
+		if screen_x > -sprite_size / 2 && screen_x < f32(SCREEN_WIDTH) + sprite_size / 2 {
+			append(
+				&render_list,
+				Enemy_Render_Data {
+					enemy = &enemy,
+					distance = transformed_y,
+					screen_x = screen_x,
+					sprite_size = sprite_size,
+				},
+			)
+		}
+	}
+
+	// Sort by distance (far to near for proper depth)
+	slice.sort_by(render_list[:], proc(a, b: Enemy_Render_Data) -> bool {
+		return a.distance > b.distance
+	})
+
+	// Render enemies
+	for render_data in render_list {
+		enemy := render_data.enemy
+
+		// Calculate sprite position (centered horizontally, bottom-aligned)
+		sprite_x := render_data.screen_x - render_data.sprite_size / 2
+		sprite_y := f32(SCREEN_HEIGHT) / 2 - render_data.sprite_size / 2 + camera.pitch * 100
+
+		// Choose color based on enemy state for visual feedback
+		tint_color := rl.WHITE
+		switch enemy.state {
+		case .idle:
+			tint_color = rl.WHITE
+		case .chasing:
+			tint_color = rl.Color{255, 200, 200, 255} // Slight red tint when chasing
+		case .attacking:
+			tint_color = rl.Color{255, 150, 150, 255} // More red when attacking
+		case .dead:
+			tint_color = rl.Color{100, 100, 100, 255} // Gray when dead
+		}
+
+		// Draw the enemy sprite
+		scale := render_data.sprite_size / f32(enemy.sprite.height)
+		rl.DrawTextureEx(enemy.sprite, rl.Vector2{sprite_x, sprite_y}, 0.0, scale, tint_color)
+
+		// Optional: Draw a health bar above the enemy
+		if enemy.health < enemy.max_health && enemy.alive {
+			bar_width: f32 = render_data.sprite_size * 0.8
+			bar_height: f32 = 4
+			bar_x := render_data.screen_x - bar_width / 2
+			bar_y := sprite_y - 10
+
+			health_ratio := f32(enemy.health) / f32(enemy.max_health)
+
+			// Background (red)
+			rl.DrawRectangle(i32(bar_x), i32(bar_y), i32(bar_width), i32(bar_height), rl.RED)
+			// Foreground (green)
+			rl.DrawRectangle(
+				i32(bar_x),
+				i32(bar_y),
+				i32(bar_width * health_ratio),
+				i32(bar_height),
+				rl.GREEN,
+			)
 		}
 	}
 }

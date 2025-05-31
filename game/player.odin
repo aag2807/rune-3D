@@ -100,7 +100,7 @@ fire_shot :: proc(player: ^Player) -> ShotResult {
 }
 
 check_enemy_hit :: proc(start: [2]f32, dx, dy, max_range: f32) -> ShotResult {
-  enemies := &game_state.enemies
+  enemies := get_enemies()
   closest_distance := max_range
   hit_enemy := false
 
@@ -118,8 +118,11 @@ check_enemy_hit :: proc(start: [2]f32, dx, dy, max_range: f32) -> ShotResult {
 
     // Calculate perpendicular distance from ray to enemy
     closest_point := start + [2]f32{dx * projection, dy * projection}
-    distance_to_enemy := math.sqrt(math.pow(enemy.pos.x - closest_point.x, 2) + 
-      math.pow(enemy.pos.y - closest_point.y, 2))
+    distance_to_enemy := math.sqrt(
+      math.pow(enemy.pos.x - closest_point.x, 2) + 
+      math.pow(enemy.pos.y - closest_point.y, 2)
+    )
+  
 
     if distance_to_enemy <= enemy.size && projection < closest_distance {
       closest_distance = projection

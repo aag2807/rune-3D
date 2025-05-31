@@ -21,7 +21,9 @@ render_frame :: proc() {
 	game_map := game.get_map()
 	player := game.get_player()
 
+
 	render_3d_view(camera, game_map)
+	render_enemies_2d(camera)
 	render_crosshair()
 	render_player_sprites(player)
 }
@@ -199,4 +201,23 @@ render_crosshair :: proc() {
 
 	rl.DrawLine(center_x - size, center_y, center_x + size, center_y, rl.WHITE)
 	rl.DrawLine(center_x, center_y - size, center_x, center_y + size, rl.WHITE)
+}
+
+@(private = "file")
+render_enemies_2d :: proc(camera: Camera) {
+	enemies := game.get_enemies()
+
+	for enemy in enemies {
+		if !enemy.alive do continue
+
+		rel_x := enemy.pos.x - camera.pos.x
+		rel_y := enemy.pos.y - camera.pos.y
+
+		distance := math.sqrt(rel_x * rel_x + rel_y * rel_y)
+
+		if distance < 8.0 {
+
+			rl.DrawTextureEx(enemy.sprite, enemy.pos, 0, 1, rl.WHITE)
+		}
+	}
 }

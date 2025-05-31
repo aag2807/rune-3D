@@ -26,7 +26,7 @@ main :: proc() {
 		toggle_cursor()
 		dt := rl.GetFrameTime()
 		inputs.update_input(dt)
-
+		game.update_enemies(dt)
 
 		//draw 
 		rl.BeginDrawing()

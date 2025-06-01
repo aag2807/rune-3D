@@ -204,29 +204,32 @@ render_crosshair :: proc() {
 	rl.DrawLine(center_x, center_y - size, center_x, center_y + size, rl.WHITE)
 }
 
+
+Enemy_Render_Data :: struct {
+	enemy:       ^game.Enemy,
+	distance:    f32,
+	screen_x:    f32,
+	sprite_size: f32,
+}
+
 @(private = "file")
 render_enemies_3d :: proc(camera: Camera) {
 	enemies := game.get_enemies()
-
-	// Create a list of enemies with their distances for depth sorting
-	Enemy_Render_Data :: struct {
-		enemy:       ^game.Enemy,
-		distance:    f32,
-		screen_x:    f32,
-		sprite_size: f32,
-	}
-
 	render_list: [dynamic]Enemy_Render_Data
 	defer delete(render_list)
+
 
 	for &enemy in enemies {
 		if !enemy.alive do continue
 
-		// Calculate relative position to camera
+		// Calculate relative position to camera (world space)
 		rel_x := enemy.pos.x - camera.pos.x
 		rel_y := enemy.pos.y - camera.pos.y
 
-		// Rotate relative to camera angle (transform to camera space)
+		// Calculate actual distance for depth sorting
+		world_distance := math.sqrt(rel_x * rel_x + rel_y * rel_y)
+
+		// Transform to camera space for projection
 		cos_a := math.cos(-camera.angle)
 		sin_a := math.sin(-camera.angle)
 
@@ -234,23 +237,23 @@ render_enemies_3d :: proc(camera: Camera) {
 		transformed_y := rel_x * sin_a + rel_y * cos_a
 
 		// Skip if behind camera or too far
-		if transformed_y <= 0.1 || transformed_y > 15.0 do continue
+		if transformed_y <= 0.1 || world_distance > 15.0 do continue
 
 		// Project to screen coordinates
 		screen_x :=
 			(transformed_x / transformed_y) * (f32(SCREEN_WIDTH) / 2) + f32(SCREEN_WIDTH) / 2
 
 		// Calculate sprite size based on distance
-		sprite_size := f32(SCREEN_HEIGHT) / transformed_y * 0.8 // 0.8 is size multiplier
+		sprite_size := f32(SCREEN_HEIGHT) / transformed_y * 0.6 // Reduced from 0.8 for better scaling
 
 		// Only render if on screen
 		if screen_x > -sprite_size / 2 && screen_x < f32(SCREEN_WIDTH) + sprite_size / 2 {
 			append(
 				&render_list,
 				Enemy_Render_Data {
-					enemy = &enemy,
-					distance = transformed_y,
-					screen_x = screen_x,
+					enemy       = &enemy,
+					distance    = world_distance, // Use world distance for sorting
+					screen_x    = screen_x,
 					sprite_size = sprite_size,
 				},
 			)
@@ -266,7 +269,7 @@ render_enemies_3d :: proc(camera: Camera) {
 	for render_data in render_list {
 		enemy := render_data.enemy
 
-		// Calculate sprite position (centered horizontally, bottom-aligned)
+		// Calculate sprite position (centered horizontally, bottom-aligned to floor)
 		sprite_x := render_data.screen_x - render_data.sprite_size / 2
 		sprite_y := f32(SCREEN_HEIGHT) / 2 - render_data.sprite_size / 2 + camera.pitch * 100
 
@@ -283,7 +286,7 @@ render_enemies_3d :: proc(camera: Camera) {
 			tint_color = rl.Color{100, 100, 100, 255} // Gray when dead
 		}
 
-		// Draw the enemy sprite
+		// Draw the enemy sprite (billboard - always faces camera)
 		scale := render_data.sprite_size / f32(enemy.sprite.height)
 		rl.DrawTextureEx(enemy.sprite, rl.Vector2{sprite_x, sprite_y}, 0.0, scale, tint_color)
 

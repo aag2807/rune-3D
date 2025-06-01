@@ -31,12 +31,13 @@ Enemy :: struct {
 
 update_enemies :: proc(dt: f32) {
 	player := get_player()
+	enemies := get_enemies()
 
-	for i in 0 ..< len(get_enemies()) {
-		enemy := get_enemies()[i]
+	for i in 0 ..< len(enemies) {
+		enemy := &enemies[i]
 		if !enemy.alive do continue
 
-		update_enemy_ai(&enemy, player, dt)
+		update_enemy_ai(enemy, player, dt)
 	}
 }
 
